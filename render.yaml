@@ -1,0 +1,16 @@
+# Optional: Render → Blueprint → paste this repo URL to create the API service.
+# After deploy, add secrets in the Render dashboard: MONGODB_URI, JWT_SECRET
+
+services:
+  - type: web
+    name: ecommerce-api
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production

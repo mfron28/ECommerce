@@ -1,0 +1,12 @@
+# Netlify: connect this GitHub repo, leave defaults — it reads this file.
+# Set Site settings → Environment variables: VITE_API_URL = https://YOUR-API.onrender.com (no trailing slash)
+
+[build]
+  base = "frontend"
+  command = "npm install && npm run build"
+  publish = "dist"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
