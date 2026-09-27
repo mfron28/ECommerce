@@ -45,11 +45,16 @@ Optional: set `VITE_API_URL=http://localhost:5050` in `frontend/.env` if you pre
 
 ## What’s included
 
-- Auth pages with client-side validation (empty fields, invalid email) and API errors (e.g. wrong password).
-- Product listing with search and filters; product detail; out-of-stock handling.
-- Server-side cart (per user), line updates, removes, and totals.
-- Checkout creates an order with server-side price and stock validation, then clears the cart.
-- Order history, loading spinners, and empty/error states.
+- Auth: login, register, profile (password + email change with verification link), forgot/reset password.
+- Products: search/filters, image gallery, reviews & star ratings, wishlist.
+- Server-side cart, **15-minute stock reservation** at checkout, coupons, shipping by region.
+- Orders with status (`pending` → `shipped` → `delivered`), shipping address, order detail page.
+- **Admin dashboard** (`/admin`): product CRUD, order status, low-stock alerts, sales summary.
+
+After `npm run seed`, admin login: **admin@shop.com** / **Admin12345!** (override with `ADMIN_EMAIL` / `ADMIN_PASSWORD` in `.env`).  
+Test coupons: **SAVE10**, **FLAT5**, **WELCOME20**.
+
+Email (Resend): set `RESEND_API_KEY` and `APP_URL` in `backend/.env`; without it, reset/verify links print in the API console.
 
 ## Production build
 

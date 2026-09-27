@@ -166,7 +166,7 @@ export function CartPage() {
             }}
           >
             <p style={{ fontSize: "1.25rem", margin: 0 }}>
-              Total: <strong>${total.toFixed(2)}</strong>
+              Subtotal: <strong>${total.toFixed(2)}</strong>
               <span className="muted" style={{ fontSize: "0.9rem", marginLeft: "0.5rem" }}>
                 (calculated on server)
               </span>

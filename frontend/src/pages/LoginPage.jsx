@@ -55,6 +55,8 @@ export function LoginPage() {
       <h1 className="page-title">Log in</h1>
       <p className="muted" style={{ marginBottom: "1.5rem" }}>
         New here? <Link to="/register">Create an account</Link>
+        {" · "}
+        <Link to="/forgot-password">Forgot password?</Link>
       </p>
       {apiError && <div className="error-banner">{apiError}</div>}
       <form onSubmit={handleSubmit}>

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client.js";
 import { Spinner } from "../components/Spinner.jsx";
+import { StarRating } from "../components/StarRating.jsx";
 
 export function ProductListPage() {
   const [products, setProducts] = useState([]);
@@ -149,6 +150,14 @@ export function ProductListPage() {
                   <h2 className="card-title">{p.name}</h2>
                 </Link>
                 <p className="card-price">${p.price.toFixed(2)}</p>
+                {p.ratingCount > 0 && (
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginTop: "0.35rem" }}>
+                    <StarRating value={p.ratingAvg} size="0.85rem" />
+                    <span className="muted" style={{ fontSize: "0.8rem" }}>
+                      ({p.ratingCount})
+                    </span>
+                  </div>
+                )}
                 <span
                   className={`stock-badge ${p.stock > 0 ? "stock-ok" : "stock-out"}`}
                 >

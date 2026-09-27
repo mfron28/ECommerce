@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -20,6 +21,22 @@ export function AuthProvider({ children }) {
   });
   const [token, setToken] = useState(() => localStorage.getItem("token"));
 
+  const refreshUser = useCallback(async () => {
+    const t = localStorage.getItem("token");
+    if (!t) return;
+    try {
+      const data = await api("/api/me", { token: t });
+      setUser(data.user);
+      localStorage.setItem("user", JSON.stringify(data.user));
+    } catch {
+      /* token invalid */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (token) refreshUser();
+  }, [token, refreshUser]);
+
   const login = useCallback((nextToken, nextUser) => {
     localStorage.setItem("token", nextToken);
     localStorage.setItem("user", JSON.stringify(nextUser));
@@ -35,10 +52,7 @@ export function AuthProvider({ children }) {
     setUser(null);
     if (t) {
       try {
-        await api("/api/logout", {
-          method: "POST",
-          token: t,
-        });
+        await api("/api/logout", { method: "POST", token: t });
       } catch {
         /* ignore */
       }
@@ -50,10 +64,12 @@ export function AuthProvider({ children }) {
       user,
       token,
       isAuthenticated: Boolean(token),
+      isAdmin: Boolean(user?.isAdmin),
       login,
       logout,
+      refreshUser,
     }),
-    [user, token, login, logout]
+    [user, token, login, logout, refreshUser]
   );
 
   return (

@@ -1,8 +1,12 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 
+// Latest Playwright HTML report, published by the ECommerce.Tests GitHub Actions workflow.
+const TEST_REPORT_URL =
+  import.meta.env.VITE_TEST_REPORT_URL || "https://mfron28.github.io/ECommerce.Tests/";
+
 export function Layout() {
-  const { isAuthenticated, user, logout } = useAuth();
+  const { isAuthenticated, user, logout, isAdmin } = useAuth();
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
@@ -45,6 +49,14 @@ export function Layout() {
             >
               Products
             </NavLink>
+            <a
+              href={TEST_REPORT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: "var(--muted)", textDecoration: "none", fontWeight: 500 }}
+            >
+              Test runs
+            </a>
             {isAuthenticated && (
               <>
                 <NavLink
@@ -58,6 +70,16 @@ export function Layout() {
                   Cart
                 </NavLink>
                 <NavLink
+                  to="/wishlist"
+                  style={({ isActive }) => ({
+                    color: isActive ? "var(--accent)" : "var(--muted)",
+                    textDecoration: "none",
+                    fontWeight: 500,
+                  })}
+                >
+                  Wishlist
+                </NavLink>
+                <NavLink
                   to="/orders"
                   style={({ isActive }) => ({
                     color: isActive ? "var(--accent)" : "var(--muted)",
@@ -67,6 +89,28 @@ export function Layout() {
                 >
                   Orders
                 </NavLink>
+                <NavLink
+                  to="/profile"
+                  style={({ isActive }) => ({
+                    color: isActive ? "var(--accent)" : "var(--muted)",
+                    textDecoration: "none",
+                    fontWeight: 500,
+                  })}
+                >
+                  Profile
+                </NavLink>
+                {isAdmin && (
+                  <NavLink
+                    to="/admin"
+                    style={({ isActive }) => ({
+                      color: isActive ? "var(--accent)" : "var(--muted)",
+                      textDecoration: "none",
+                      fontWeight: 500,
+                    })}
+                  >
+                    Admin
+                  </NavLink>
+                )}
               </>
             )}
             {!isAuthenticated ? (

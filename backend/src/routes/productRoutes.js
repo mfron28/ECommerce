@@ -2,6 +2,13 @@ import { Router } from "express";
 import mongoose from "mongoose";
 import { Product } from "../models/Product.js";
 import { AppError } from "../utils/errors.js";
+import { productDto } from "../utils/productDto.js";
+import { requireAuth } from "../middleware/auth.js";
+import { listReviews, createReview } from "../services/reviewService.js";
+import { reviewSchema } from "../validation/review.js";
+import { parseBody } from "../utils/parseBody.js";
+import { isInWishlist } from "../services/wishlistService.js";
+import { optionalAuth } from "../middleware/optionalAuth.js";
 
 const router = Router();
 
@@ -34,22 +41,38 @@ router.get("/", async (req, res, next) => {
     const products = await Product.find(filter).sort({ name: 1 }).lean();
     res.json({
       status: "ok",
-      products: products.map((p) => ({
-        id: p._id.toString(),
-        name: p.name,
-        description: p.description,
-        price: p.price,
-        image: p.image,
-        stock: p.stock,
-        category: p.category,
-      })),
+      products: products.map((p) => productDto(p)),
     });
   } catch (e) {
     next(e);
   }
 });
 
-router.get("/:id", async (req, res, next) => {
+router.get("/:id/reviews", async (req, res, next) => {
+  try {
+    const reviews = await listReviews(req.params.id);
+    res.json({ status: "ok", reviews });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post("/:id/reviews", requireAuth, async (req, res, next) => {
+  try {
+    const { rating, comment } = parseBody(reviewSchema, req.body);
+    const ratings = await createReview(
+      req.user._id,
+      req.params.id,
+      rating,
+      comment
+    );
+    res.status(201).json({ status: "ok", ...ratings });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.get("/:id", optionalAuth, async (req, res, next) => {
   try {
     const { id } = req.params;
     if (!mongoose.isValidObjectId(id)) {
@@ -59,17 +82,12 @@ router.get("/:id", async (req, res, next) => {
     if (!p) {
       throw new AppError("Product not found", 404);
     }
+    const inWishlist = req.user
+      ? await isInWishlist(req.user._id, id)
+      : false;
     res.json({
       status: "ok",
-      product: {
-        id: p._id.toString(),
-        name: p.name,
-        description: p.description,
-        price: p.price,
-        image: p.image,
-        stock: p.stock,
-        category: p.category,
-      },
+      product: { ...productDto(p), inWishlist },
     });
   } catch (e) {
     next(e);

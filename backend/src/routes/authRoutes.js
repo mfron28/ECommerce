@@ -4,8 +4,18 @@ import jwt from "jsonwebtoken";
 import { User } from "../models/User.js";
 import { AppError } from "../utils/errors.js";
 import { loginSchema, registerSchema } from "../validation/auth.js";
+import {
+  forgotPasswordSchema,
+  resetPasswordSchema,
+} from "../validation/profile.js";
 import { parseBody } from "../utils/parseBody.js";
 import { requireAuth } from "../middleware/auth.js";
+import { userDto } from "../utils/userDto.js";
+import {
+  requestPasswordReset,
+  resetPassword,
+  confirmEmailChange,
+} from "../services/profileService.js";
 
 const router = Router();
 
@@ -16,6 +26,10 @@ function signToken(userId) {
   }
   return jwt.sign({ sub: userId }, secret, { expiresIn: "7d" });
 }
+
+router.get("/me", requireAuth, (req, res) => {
+  res.json({ status: "ok", user: userDto(req.user) });
+});
 
 router.post("/register", async (req, res, next) => {
   try {
@@ -30,7 +44,7 @@ router.post("/register", async (req, res, next) => {
     res.status(201).json({
       status: "ok",
       token,
-      user: { id: user._id, email: user.email },
+      user: userDto(user),
     });
   } catch (e) {
     next(e);
@@ -52,7 +66,7 @@ router.post("/login", async (req, res, next) => {
     res.json({
       status: "ok",
       token,
-      user: { id: user._id, email: user.email },
+      user: userDto(user),
     });
   } catch (e) {
     next(e);
@@ -61,6 +75,43 @@ router.post("/login", async (req, res, next) => {
 
 router.post("/logout", requireAuth, (_req, res) => {
   res.json({ status: "ok", message: "Logged out" });
+});
+
+router.post("/forgot-password", async (req, res, next) => {
+  try {
+    const { email } = parseBody(forgotPasswordSchema, req.body);
+    const result = await requestPasswordReset(email);
+    res.json({ status: "ok", ...result });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post("/reset-password", async (req, res, next) => {
+  try {
+    const { token, password } = parseBody(resetPasswordSchema, req.body);
+    await resetPassword(token, password);
+    res.json({ status: "ok", message: "Password reset successful" });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.get("/verify-email", async (req, res, next) => {
+  try {
+    const token = req.query.token;
+    if (!token) {
+      throw new AppError("Verification token required", 400);
+    }
+    const user = await confirmEmailChange(token);
+    res.json({
+      status: "ok",
+      message: "Email verified",
+      user: userDto(user),
+    });
+  } catch (e) {
+    next(e);
+  }
 });
 
 export default router;

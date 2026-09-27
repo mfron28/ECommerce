@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { Cart } from "../models/Cart.js";
 import { Product } from "../models/Product.js";
 import { AppError } from "../utils/errors.js";
+import { availableForUser, getUserHoldExpiry } from "./stockHoldService.js";
 
 async function getOrCreateCart(userId) {
   let cart = await Cart.findOne({ user: userId });
@@ -19,6 +20,7 @@ export async function getCartWithTotals(userId) {
   for (const line of cart.items) {
     const p = line.product;
     if (!p) continue;
+    const available = await availableForUser(p, userId);
     const lineTotal = p.price * line.quantity;
     subtotal += lineTotal;
     lines.push({
@@ -27,13 +29,15 @@ export async function getCartWithTotals(userId) {
       price: p.price,
       image: p.image,
       stock: p.stock,
+      availableStock: available,
       category: p.category,
       quantity: line.quantity,
       lineTotal,
-      outOfStock: p.stock < line.quantity,
+      outOfStock: available < line.quantity,
     });
   }
-  return { cartId: cart._id, items: lines, total: subtotal };
+  const stockHoldExpiresAt = await getUserHoldExpiry(userId);
+  return { cartId: cart._id, items: lines, subtotal, total: subtotal, stockHoldExpiresAt };
 }
 
 export async function addToCart(userId, productId, quantity) {
@@ -44,10 +48,11 @@ export async function addToCart(userId, productId, quantity) {
   if (!product) {
     throw new AppError("Product not found", 404);
   }
-  if (product.stock < 1) {
+  const available = await availableForUser(product, userId);
+  if (available < 1) {
     throw new AppError("Product out of stock", 400);
   }
-  if (quantity > product.stock) {
+  if (quantity > available) {
     throw new AppError("Not enough stock available", 400);
   }
   const cart = await getOrCreateCart(userId);
@@ -56,7 +61,7 @@ export async function addToCart(userId, productId, quantity) {
   );
   if (idx >= 0) {
     const nextQty = cart.items[idx].quantity + quantity;
-    if (nextQty > product.stock) {
+    if (nextQty > available) {
       throw new AppError("Not enough stock available", 400);
     }
     cart.items[idx].quantity = nextQty;
@@ -75,7 +80,8 @@ export async function updateCartLine(userId, productId, quantity) {
   if (!product) {
     throw new AppError("Product not found", 404);
   }
-  if (quantity > product.stock) {
+  const available = await availableForUser(product, userId);
+  if (quantity > available) {
     throw new AppError("Not enough stock available", 400);
   }
   const cart = await Cart.findOne({ user: userId });

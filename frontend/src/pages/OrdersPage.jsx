@@ -3,13 +3,8 @@ import { Link } from "react-router-dom";
 import { api } from "../api/client.js";
 import { Spinner } from "../components/Spinner.jsx";
 
-function formatDate(iso) {
-  if (!iso) return "";
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return String(iso);
-  }
+function StatusBadge({ status }) {
+  return <span className={`status-badge status-${status}`}>{status}</span>;
 }
 
 export function OrdersPage() {
@@ -18,22 +13,10 @@ export function OrdersPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError("");
     api("/api/orders")
-      .then((data) => {
-        if (!cancelled) setOrders(data.orders || []);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err.message || "Failed to load orders");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+      .then((data) => setOrders(data.orders || []))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
   }, []);
 
   if (loading) return <Spinner />;
@@ -49,7 +32,6 @@ export function OrdersPage() {
         </div>
       )}
       {!error &&
-        orders.length > 0 &&
         orders.map((o) => (
           <article
             key={o.id}
@@ -62,33 +44,29 @@ export function OrdersPage() {
                 justifyContent: "space-between",
                 flexWrap: "wrap",
                 gap: "0.5rem",
-                marginBottom: "1rem",
+                marginBottom: "0.75rem",
               }}
             >
-              <span className="muted">Order #{o.id.slice(-8)}</span>
-              <span className="muted">{formatDate(o.createdAt)}</span>
+              <Link to={`/orders/${o.id}`} style={{ fontWeight: 600 }}>
+                Order #{o.id.slice(-8)}
+              </Link>
+              <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+                <StatusBadge status={o.status} />
+                <span className="muted">{new Date(o.createdAt).toLocaleString()}</span>
+              </div>
             </div>
-            <ul style={{ listStyle: "none", padding: 0, margin: "0 0 1rem" }}>
-              {o.items.map((it, i) => (
-                <li
-                  key={`${o.id}-${i}`}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    padding: "0.35rem 0",
-                    fontSize: "0.95rem",
-                  }}
-                >
-                  <span>
-                    {it.name} × {it.quantity}
-                  </span>
-                  <span>${(it.price * it.quantity).toFixed(2)}</span>
-                </li>
-              ))}
-            </ul>
+            <p className="muted" style={{ margin: "0 0 0.5rem" }}>
+              {o.items.length} item(s)
+            </p>
             <div style={{ fontWeight: 700, color: "var(--accent)" }}>
               Total: ${o.total.toFixed(2)}
             </div>
+            <Link
+              to={`/orders/${o.id}`}
+              style={{ display: "inline-block", marginTop: "0.75rem", fontSize: "0.9rem" }}
+            >
+              View details →
+            </Link>
           </article>
         ))}
     </div>

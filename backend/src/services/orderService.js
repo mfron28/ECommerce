@@ -2,10 +2,35 @@ import mongoose from "mongoose";
 import { Order } from "../models/Order.js";
 import { Product } from "../models/Product.js";
 import { getCartWithTotals, clearCart } from "./cartService.js";
+import { validateCoupon } from "./couponService.js";
+import { getShippingCost } from "../utils/shipping.js";
+import {
+  assertActiveHolds,
+  releaseUserHolds,
+} from "./stockHoldService.js";
 import { AppError } from "../utils/errors.js";
 
-export async function createOrderFromCart(userId) {
-  const { items, total } = await getCartWithTotals(userId);
+function orderDto(o) {
+  return {
+    id: o._id.toString(),
+    items: o.items,
+    status: o.status,
+    subtotal: o.subtotal ?? o.total,
+    discountAmount: o.discountAmount ?? 0,
+    shippingCost: o.shippingCost ?? 0,
+    couponCode: o.couponCode,
+    shippingRegion: o.shippingRegion,
+    shippingAddress: o.shippingAddress,
+    total: o.total,
+    createdAt: o.createdAt,
+    updatedAt: o.updatedAt,
+  };
+}
+
+export async function createOrderFromCart(userId, payload) {
+  await assertActiveHolds(userId);
+
+  const { items, subtotal } = await getCartWithTotals(userId);
   if (!items.length) {
     throw new AppError("Cannot checkout with an empty cart", 400);
   }
@@ -15,7 +40,22 @@ export async function createOrderFromCart(userId) {
     }
   }
 
-  let computedTotal = 0;
+  const shippingAddress = payload.shippingAddress;
+  if (!shippingAddress?.fullName || !shippingAddress?.line1 || !shippingAddress?.city || !shippingAddress?.postalCode || !shippingAddress?.country) {
+    throw new AppError("Complete shipping address is required", 400);
+  }
+
+  const { region, cost: shippingCost } = getShippingCost(payload.shippingRegion);
+
+  let discountAmount = 0;
+  let couponCode = null;
+  if (payload.couponCode) {
+    const coupon = await validateCoupon(payload.couponCode, subtotal);
+    discountAmount = coupon.discountAmount;
+    couponCode = coupon.code;
+  }
+
+  let computedSubtotal = 0;
   const orderLines = [];
 
   for (const line of items) {
@@ -29,8 +69,7 @@ export async function createOrderFromCart(userId) {
     if (product.stock < line.quantity) {
       throw new AppError("Not enough stock available", 400);
     }
-    const lineTotal = product.price * line.quantity;
-    computedTotal += lineTotal;
+    computedSubtotal += product.price * line.quantity;
     orderLines.push({
       productId: product._id,
       name: product.name,
@@ -40,16 +79,18 @@ export async function createOrderFromCart(userId) {
     });
   }
 
-  if (Math.abs(computedTotal - total) > 0.001) {
+  if (Math.abs(computedSubtotal - subtotal) > 0.001) {
     throw new AppError("Cart total mismatch — refresh your cart", 409);
   }
 
+  const total = Math.max(
+    0,
+    Math.round((computedSubtotal - discountAmount + shippingCost) * 100) / 100
+  );
+
   for (const line of orderLines) {
     const updated = await Product.findOneAndUpdate(
-      {
-        _id: line.productId,
-        stock: { $gte: line.quantity },
-      },
+      { _id: line.productId, stock: { $gte: line.quantity } },
       { $inc: { stock: -line.quantity } },
       { new: true }
     );
@@ -61,9 +102,17 @@ export async function createOrderFromCart(userId) {
   const order = await Order.create({
     user: userId,
     items: orderLines,
-    total: computedTotal,
+    status: "pending",
+    subtotal: computedSubtotal,
+    discountAmount,
+    shippingCost,
+    couponCode,
+    shippingRegion: region,
+    shippingAddress,
+    total,
   });
 
+  await releaseUserHolds(userId);
   await clearCart(userId);
 
   return order;
@@ -73,13 +122,32 @@ export async function listOrders(userId) {
   return Order.find({ user: userId }).sort({ createdAt: -1 }).lean();
 }
 
-export async function getOrder(userId, orderId) {
+export async function getOrder(userId, orderId, { admin = false } = {}) {
   if (!mongoose.isValidObjectId(orderId)) {
     throw new AppError("Invalid order id", 400);
   }
-  const order = await Order.findOne({ _id: orderId, user: userId }).lean();
+  const filter = admin ? { _id: orderId } : { _id: orderId, user: userId };
+  const order = await Order.findOne(filter).lean();
   if (!order) {
     throw new AppError("Order not found", 404);
   }
   return order;
 }
+
+export async function updateOrderStatus(orderId, status) {
+  const allowed = ["pending", "shipped", "delivered"];
+  if (!allowed.includes(status)) {
+    throw new AppError("Invalid order status", 400);
+  }
+  const order = await Order.findByIdAndUpdate(
+    orderId,
+    { status },
+    { new: true }
+  ).lean();
+  if (!order) {
+    throw new AppError("Order not found", 404);
+  }
+  return order;
+}
+
+export { orderDto };
